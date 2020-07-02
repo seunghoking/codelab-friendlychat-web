@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Google Inc. All Rights Reserved.
+ * Copyright 2015 Google Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,91 +14,45 @@
  * limitations under the License.
  */
 'use strict';
-//처음에 uid가 없기때문에 한번 방을 로드해야해서 필요한 플래그
-//GLOBAL VARIABLE
-let G_CHECK_ROOM_FLAG = false;
-let G_ROOMUID = null;
-// 방 리스트를 나타내고, li 태그 string으로 이루어져 있는 배열
-let arrRoomListHtml = [];
-let liRoomId = null; 
 
-// click event
-$(document).ready(function(){
-    roomCreateButtonElement.addEventListener('click', function(){
-        if(!isUserSignedIn()){
-            alert("먼저 로그인 하세요");
-            return;
-        }
-        let inputRoom = $("#inputRoom").val();
-        if( inputRoom == ""){
-            alert("방이름을 입력하세요");
-            return;
-        }
-        createRoom(inputRoom);
-    });
-    roomSearchButtonElement.addEventListener('click', function(){
-        if(!isUserSignedIn()){
-            alert("먼저 로그인 하세요");
-            return;
-        }
-        $("#roomTitleContainer").css('display', 'none');
-        $("#roomListContainer").css('display', 'block');
-    });
-    $(".mdl-layout__header").click(function(){
-        $("#roomTitleContainer").css('display', 'block');
-        $("#roomListContainer").css('display', 'none');
-        $("#messages-card-container").css('display','none');
-        $("#messages").empty();
-    });
-    // 페이지가 로드 해오면서 진행이 되기때문에 수정하였음.
-    $(document).on("click",".liRoomList", function(){
-        $("#roomListContainer").css('display', 'none');
-        $("#roomTitleContainer").css('display', 'none');
-        $("#messages-card-container").css('display','block');
-        let liRoomIndex = $(".liRoomList").index(this);
-        liRoomId = $(".liRoomList")[liRoomIndex].id;
-        loadMessages(liRoomId);
-    });
-});
 // Signs-in Friendly Chat.
 function signIn() {
-    let provider = new firebase.auth.GoogleAuthProvider();
-    firebase.auth().signInWithPopup(provider);
+  // Sign in Firebase using popup auth and Google as the identity provider.
+  var provider = new firebase.auth.GoogleAuthProvider();
+  firebase.auth().signInWithPopup(provider);
 }
 
 // Signs-out of Friendly Chat.
 function signOut() {
-    firebase.auth().signOut();
+  // Sign out of Firebase.
+  firebase.auth().signOut();
 }
 
 // Initiate firebase auth.
 function initFirebaseAuth() {
-    firebase.auth().onAuthStateChanged(authStateObserver);
+  // Listen to auth state changes.
+  firebase.auth().onAuthStateChanged(authStateObserver);
 }
 
 // Returns the signed-in user's profile Pic URL.
 function getProfilePicUrl() {
-    return firebase.auth().currentUser.photoURL || '/images/profile_placeholder.png';
+  return firebase.auth().currentUser.photoURL || '/images/profile_placeholder.png';
 }
 
 // Returns the signed-in user's display name.
 function getUserName() {
-    return firebase.auth().currentUser.displayName;
+  return firebase.auth().currentUser.displayName;
 }
 
 // Returns true if a user is signed-in.
 function isUserSignedIn() {
-    return !!firebase.auth().currentUser;
+  return !!firebase.auth().currentUser;
 }
 
-// Saves a new message on the Firebase DB.
+// Saves a new message on the Cloud Firestore.
 function saveMessage(messageText) {
-  return firebase.firestore()
-         .collection('rooms')
-         .doc(firebase.auth().currentUser.uid)
-         .collection('roomNum')
-         .doc(liRoomId)
-         .collection('messages').add({
+  // Add a new message entry to the Firebase database.
+  return firebase.firestore().collection('messages').add({
     name: getUserName(),
     text: messageText,
     profilePicUrl: getProfilePicUrl(),
@@ -109,13 +63,10 @@ function saveMessage(messageText) {
 }
 
 // Loads chat messages history and listens for upcoming ones.
-// ************
-function loadMessages(id) {
-  /*  var query = firebase.firestore()
-                  .collection('messages')
-                  .orderBy('timestamp', 'desc')
-                  .limit(12);
-
+function loadMessages() {
+  // Create the query to load the last 12 messages and listen for new ones.
+  var query = firebase.firestore().collection('messages').orderBy('timestamp', 'desc').limit(12);
+  
   // Start listening to the query.
   query.onSnapshot(function(snapshot) {
     snapshot.docChanges().forEach(function(change) {
@@ -124,31 +75,10 @@ function loadMessages(id) {
       } else {
         var message = change.doc.data();
         displayMessage(change.doc.id, message.timestamp, message.name,
-                       message.text, message.profilePicUrl, message.imageUrl);
+                      message.text, message.profilePicUrl, message.imageUrl);
       }
     });
-  });*/
-    let query = firebase.firestore()
-                .collection('rooms')
-                .doc(firebase.auth().currentUser.uid)
-                .collection('roomNum')
-                .doc(id)
-                .collection('messages')
-                .orderBy('timestamp', 'desc')
-                .limit(12);
-
-    query.onSnapshot(function(snapshot){
-        snapshot.docChanges().forEach(function(change){
-            if(change.type == 'removed') {
-                deleteMessage(change.doc.id);
-            } else {
-                let message = change.doc.data();
-                displayMessage(change.doc.id, message.timestamp, message.name,
-                                message.text, message.profilePicUrl, message.imageUrl);
-                console.log(message);
-              }
-        });
-    });
+  });
 }
 
 // Saves a new message containing an image in Firebase.
@@ -166,7 +96,7 @@ function saveImageMessage(file) {
     return firebase.storage().ref(filePath).put(file).then(function(fileSnapshot) {
       // 3 - Generate a public URL for the file.
       return fileSnapshot.ref.getDownloadURL().then((url) => {
-        // 4 - Update the chat message placeholder with the image's URL.
+        // 4 - Update the chat message placeholder with the image’s URL.
         return messageRef.update({
           imageUrl: url,
           storageUri: fileSnapshot.metadata.fullPath
@@ -180,7 +110,7 @@ function saveImageMessage(file) {
 
 // Saves the messaging device token to the datastore.
 function saveMessagingDeviceToken() {
-    firebase.messaging().getToken().then(function(currentToken) {
+  firebase.messaging().getToken().then(function(currentToken) {
     if (currentToken) {
       console.log('Got FCM device token:', currentToken);
       // Saving the Device Token to the datastore.
@@ -197,13 +127,13 @@ function saveMessagingDeviceToken() {
 
 // Requests permissions to show notifications.
 function requestNotificationsPermissions() {
-    console.log('Requesting notifications permission...');
-    firebase.messaging().requestPermission().then(function() {
+  console.log('Requesting notifications permission...');
+  firebase.messaging().requestPermission().then(function() {
     // Notification permission granted.
-        saveMessagingDeviceToken();
-    }).catch(function(error) {
-        console.error('Unable to get permission to notify.', error);
-    });
+    saveMessagingDeviceToken();
+  }).catch(function(error) {
+    console.error('Unable to get permission to notify.', error);
+  });
 }
 
 // Triggered when a file is selected via the media picker.
@@ -263,10 +193,7 @@ function authStateObserver(user) {
 
     // We save the Firebase Messaging Device token and enable notifications.
     saveMessagingDeviceToken();
-    checkAndSaveUser(user);
-    checkRooms();
   } else { // User is signed out!
-    arrRoomListHtml = [];
     // Hide user's profile and sign-out button.
     userNameElement.setAttribute('hidden', 'true');
     userPicElement.setAttribute('hidden', 'true');
@@ -275,84 +202,6 @@ function authStateObserver(user) {
     // Show sign-in button.
     signInButtonElement.removeAttribute('hidden');
   }
-}
-
-
-/**
-* 신규 User를 IndexedDB에서 체크 후 저장
-*/
-function checkAndSaveUser(user){
-    let userUid = user.uid;
-    let data = {
-        email : user.email,
-        userName: user.displayName, 
-        profileImg : user.photoURL ? user.photoURL : ''
-    };
-
-    // 위의 data json 형식으로 users collection 생성
-    let setDoc = firebase.firestore().collection('Users').doc(userUid).set(data);
-}
-
-/*
-* 유저가 채팅방을 생성할 때
-*/
-function createRoom(inputRoom){
-    $("#roomListContainer").css('display', 'block');
-    $("#roomTitleContainer").css('display', 'none');
-    let currUserUid = firebase.auth().currentUser.uid;
-    let getNewUid  = firebase.firestore().collection('rooms').doc(currUserUid).collection('roomNum').doc().id;
-    let roomData = {
-        roomUid : getNewUid, 
-        roomName : inputRoom,
-        timeStamp : firebase.firestore.FieldValue.serverTimestamp(),
-        userList : [
-            currUserUid
-        ],
-        userCount : 1 
-    }
-    G_ROOMUID = getNewUid; 
-
-    // Add a new document with a generated id.
-    let messageRef = firebase.firestore().collection('rooms').doc(currUserUid).collection('roomNum').add(roomData);
-}
-
-// 채팅방 실시간 확인할 수 있도록 snapshot 적용
-function checkRooms() {
-    if(isUserSignedIn()){
-        let liRoomTemplate = "";
-        let liStyle = "style = "+"'list-style : none;'"; 
-        let removeBool = false;
-        let doc = firebase.firestore().collection('rooms').doc(firebase.auth().currentUser.uid).collection('roomNum');
-        doc.onSnapshot(function(snapshot) {
-            snapshot.docChanges().forEach(function(change){
-                if(change.type === 'removed'){
-                    console.log("Remove Room");            
-                    removeBool = true;
-                    deleteMessage(change.doc.data().roomName);
-
-                }
-                else{
-                    removeBool = false;
-                    console.log('New Room: ', change.doc.data());
-                    liRoomTemplate = "<li class='liRoomList' id='" + change.doc.data().roomName  + "'"+liStyle+">" + getUserName()+"_"+change.doc.data().roomName  +"<span></span></li>";
-                    arrRoomListHtml.push(liRoomTemplate);
-                }
-            });
-            if(!removeBool){
-                displayRooms(arrRoomListHtml);
-            }
-        });
-    }
-    else{
-        console.log("check room fail");
-        return false;
-    }
-}
-
-// 방 리스트가 있는 배열을 join하여 방 리스트 화면 생성
-function displayRooms(displayData){
-    let displayHtml = displayData.reverse().join('');
-    $("#ulroomList").html(displayHtml);
 }
 
 // Returns true if user is signed-in. Otherwise false and displays a message.
@@ -494,14 +343,11 @@ function checkSetup() {
         'sure you are running the codelab using `firebase serve`');
   }
 }
+
 // Checks that Firebase has been imported.
 checkSetup();
 
 // Shortcuts to DOM Elements.
-var messageCardElement = document.getElementById('messages-card');
-var roomCreateButtonElement = document.getElementById('roomCreateBtn');
-var roomSearchButtonElement = document.getElementById('roomSearchBtn');
-// 맨처음 메시지 카드 엘리먼트
 var messageListElement = document.getElementById('messages');
 var messageFormElement = document.getElementById('message-form');
 var messageInputElement = document.getElementById('message');
@@ -514,7 +360,6 @@ var userNameElement = document.getElementById('user-name');
 var signInButtonElement = document.getElementById('sign-in');
 var signOutButtonElement = document.getElementById('sign-out');
 var signInSnackbarElement = document.getElementById('must-signin-snackbar');
-
 
 // Saves message on form submit.
 messageFormElement.addEventListener('submit', onMessageFormSubmit);
@@ -535,8 +380,8 @@ mediaCaptureElement.addEventListener('change', onMediaFileSelected);
 // initialize Firebase
 initFirebaseAuth();
 
-// TODO: Enable Firebase Performance Monitoring.
+ // TODO: Enable Firebase Performance Monitoring.
+firebase.performance();
 
 // We load currently existing chat messages and listen to new ones.
-//loadMessages();
-//checkRooms();
+loadMessages();

@@ -313,7 +313,13 @@ function createRoom(inputRoom){
     G_ROOMUID = getNewUid; 
 
     // Add a new document with a generated id.
-    let messageRef = firebase.firestore().collection('rooms').doc(currUserUid).collection('roomNum').add(roomData);
+    let messageRef = firebase.firestore().collection('rooms').doc(currUserUid).collection('roomNum').add(roomData)
+        .then(function(docRef) {
+            console.log("Document written with ID: ", docRef.id);
+        })
+        .catch(function(error) {
+            console.error("Error adding document: ", error);
+        });
 }
 
 // 채팅방 실시간 확인할 수 있도록 snapshot 적용
